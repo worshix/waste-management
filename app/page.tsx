@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, Truck, Navigation, Plus, Menu, X } from 'lucide-react';
 
