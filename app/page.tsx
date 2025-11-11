@@ -601,13 +601,13 @@ const HarareGarbageRouter = () => {
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => handleEditLocation(rank)}
-                      className="flex-1 px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded flex items-center justify-center gap-1"
+                      className="flex-1 px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded flex items-center justify-center gap-1 transition"
                     >
                       <Edit2 size={12} /> Edit
                     </button>
                     <button
                       onClick={() => handleDeleteLocation(rank.id)}
-                      className="flex-1 px-3 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded flex items-center justify-center gap-1"
+                      className="flex-1 px-3 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded flex items-center justify-center gap-1 transition"
                     >
                       <Trash2 size={12} /> Delete
                     </button>
@@ -705,27 +705,27 @@ const HarareGarbageRouter = () => {
       {/* Location Form Modal */}
       {showLocationForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
-            <h2 className="text-xl font-bold mb-4">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md shadow-2xl">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
               {editingRank ? 'Edit Location' : 'Add New Location'}
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-semibold text-gray-800 mb-1">Name</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   placeholder="e.g., Fifth Street Rank"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
+                <label className="block text-sm font-semibold text-gray-800 mb-1">Priority</label>
                 <select
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white font-medium"
                 >
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
@@ -733,7 +733,7 @@ const HarareGarbageRouter = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-800 mb-1">
                   Fill Level ({formData.fillLevel}%)
                 </label>
                 <input
@@ -742,47 +742,53 @@ const HarareGarbageRouter = () => {
                   max="100"
                   value={formData.fillLevel}
                   onChange={(e) => setFormData({ ...formData, fillLevel: parseInt(e.target.value) })}
-                  className="w-full"
+                  className="w-full accent-blue-600"
                 />
+                <div className="flex justify-between text-xs text-gray-600 mt-1">
+                  <span>0%</span>
+                  <span>100%</span>
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-800 mb-1">
                   Fill Rate (%/hour)
                 </label>
                 <input
                   type="number"
                   value={formData.fillRate}
                   onChange={(e) => setFormData({ ...formData, fillRate: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   step="0.1"
+                  min="0"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-800 mb-1">
                   Capacity (kg)
                 </label>
                 <input
                   type="number"
                   value={formData.capacity}
                   onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                  min="0"
                 />
               </div>
-              <div className="flex gap-2 mt-6">
+              <div className="flex gap-2 mt-6 pt-2">
                 <button
                   onClick={() => {
                     setShowLocationForm(false);
                     setEditingRank(null);
                     setFormData({ name: '', priority: 'medium', fillLevel: 50, fillRate: 3, capacity: 1000 });
                   }}
-                  className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold"
+                  className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={editingRank ? handleUpdateLocation : handleAddLocation}
                   disabled={!formData.name}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
                 >
                   {editingRank ? 'Update' : 'Add'}
                 </button>
