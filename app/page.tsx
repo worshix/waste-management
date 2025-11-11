@@ -76,19 +76,29 @@ const HarareGarbageRouter = () => {
         maxZoom: 19
       }).addTo(mapInstance);
 
-      // Add click handler for adding locations or depot
-      mapInstance.on('click', (e: any) => {
-        if (settingDepot) {
-          handleDepotClick(e.latlng);
-        } else if (addingLocation) {
-          handleAddLocationClick(e.latlng);
-        }
-      });
-
       setMap(mapInstance);
       updateMarkersForMap(mapInstance, initialRanks);
     }
   };
+
+  // Add effect to handle map clicks based on mode
+  useEffect(() => {
+    if (!map) return;
+
+    const handleMapClick = (e: any) => {
+      if (settingDepot) {
+        handleDepotClick(e.latlng);
+      } else if (addingLocation) {
+        handleAddLocationClick(e.latlng);
+      }
+    };
+
+    map.on('click', handleMapClick);
+
+    return () => {
+      map.off('click', handleMapClick);
+    };
+  }, [map, settingDepot, addingLocation]);
 
   const handleDepotClick = (latlng: any) => {
     if (!map) return;
@@ -541,8 +551,11 @@ const HarareGarbageRouter = () => {
             Generate Route
           </button>
           <button 
-            onClick={() => setSettingDepot(true)}
-            className={`w-full ${settingDepot ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'} py-3 rounded-lg font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-2`}
+            onClick={() => {
+              setSettingDepot(!settingDepot);
+              setAddingLocation(false);
+            }}
+            className={`w-full ${settingDepot ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'} py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 ${!settingDepot ? 'hover:bg-gray-200' : ''}`}
           >
             <MapPinned size={18} />
             {settingDepot ? 'Click Map for Depot' : 'Set Depot Location'}
@@ -681,8 +694,26 @@ const HarareGarbageRouter = () => {
         </div>
 
         {settingDepot && (
-          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[1000] bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg">
-            🚚 Click on the map to set depot location
+          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[1000] bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <span>🚚 Click on the map to set depot location</span>
+            <button
+              onClick={() => setSettingDepot(false)}
+              className="ml-2 px-3 py-1 bg-white text-blue-600 rounded hover:bg-gray-100 text-sm font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {addingLocation && (
+          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[1000] bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <span>📍 Click on the map to add a new collection point</span>
+            <button
+              onClick={() => setAddingLocation(false)}
+              className="ml-2 px-3 py-1 bg-white text-green-600 rounded hover:bg-gray-100 text-sm font-semibold"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
