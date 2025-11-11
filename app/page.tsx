@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Truck, Navigation, Plus, Menu, X, Edit2, Trash2, MapPinned } from 'lucide-react';
+import { MapPin, Truck, Navigation, Plus, Menu, X, Edit2, Trash2, MapPinned, Loader2 } from 'lucide-react';
 import { Rank, Depot, Route } from './lib/types';
 import { nearestNeighborRoute, priorityWeightedRoute, compareAlgorithms } from './lib/algorithms';
+import { getRealRouteMetrics } from './lib/routing';
 
 const HarareGarbageRouter = () => {
   const mapRef = useRef(null);
@@ -16,6 +17,8 @@ const HarareGarbageRouter = () => {
   const [currentRoute, setCurrentRoute] = useState<Route | null>(null);
   const [algorithm, setAlgorithm] = useState<'nearest' | 'priority'>('priority');
   const [showComparison, setShowComparison] = useState(false);
+  const [isGeneratingRoute, setIsGeneratingRoute] = useState(false);
+  const [routeGeometry, setRouteGeometry] = useState<any>(null);
 
   // Initial rank locations in Harare CBD
   const initialRanks: Rank[] = [
@@ -274,7 +277,7 @@ const HarareGarbageRouter = () => {
     updateMarkersForMap(map, ranks);
   };
 
-  const handleGenerateRoute = () => {
+  const handleGenerateRoute = async () => {
     if (!depot) {
       alert('Please set a depot location first!');
       return;
@@ -285,15 +288,44 @@ const HarareGarbageRouter = () => {
       return;
     }
 
-    const route = algorithm === 'nearest' 
-      ? nearestNeighborRoute(depot, ranks)
-      : priorityWeightedRoute(depot, ranks);
+    setIsGeneratingRoute(true);
 
-    setCurrentRoute(route);
-    visualizeRoute(route);
+    try {
+      // Step 1: Use algorithm to determine optimal order (fast, uses Haversine)
+      const route = algorithm === 'nearest' 
+        ? nearestNeighborRoute(depot, ranks)
+        : priorityWeightedRoute(depot, ranks);
+
+      // Step 2: Get real road-based route from OSRM
+      const realMetrics = await getRealRouteMetrics(depot, route.locations);
+
+      if (realMetrics) {
+        // Update route with real road metrics
+        const updatedRoute: Route = {
+          ...route,
+          totalDistance: realMetrics.distance,
+          estimatedTime: realMetrics.duration,
+        };
+
+        setCurrentRoute(updatedRoute);
+        setRouteGeometry(realMetrics.geometry);
+        visualizeRoute(updatedRoute, realMetrics.geometry);
+      } else {
+        // Fallback to straight-line route if OSRM fails
+        console.warn('OSRM routing failed, using straight-line route');
+        setCurrentRoute(route);
+        setRouteGeometry(null);
+        visualizeRoute(route, null);
+      }
+    } catch (error) {
+      console.error('Error generating route:', error);
+      alert('Failed to generate route. Please try again.');
+    } finally {
+      setIsGeneratingRoute(false);
+    }
   };
 
-  const visualizeRoute = (route: Route) => {
+  const visualizeRoute = (route: Route, geometry: any) => {
     if (!map) return;
     const L = window.L;
 
@@ -305,19 +337,36 @@ const HarareGarbageRouter = () => {
     // Clear existing numbered markers
     markers.forEach(m => map.removeLayer(m.marker));
 
-    // Create route coordinates
-    const coordinates = [
-      [route.depot.lat, route.depot.lng],
-      ...route.locations.map(loc => [loc.lat, loc.lng]),
-      [route.depot.lat, route.depot.lng],
-    ];
+    let polyline;
 
-    // Draw route polyline
-    const polyline = L.polyline(coordinates, {
-      color: '#3b82f6',
-      weight: 4,
-      opacity: 0.7,
-    }).addTo(map);
+    if (geometry && geometry.coordinates) {
+      // Use real road geometry from OSRM
+      // OSRM returns coordinates as [lng, lat], but Leaflet expects [lat, lng]
+      const coordinates = geometry.coordinates.map((coord: [number, number]) => [
+        coord[1], // lat
+        coord[0], // lng
+      ]);
+
+      polyline = L.polyline(coordinates, {
+        color: '#3b82f6',
+        weight: 5,
+        opacity: 0.8,
+      }).addTo(map);
+    } else {
+      // Fallback to straight-line route
+      const coordinates = [
+        [route.depot.lat, route.depot.lng],
+        ...route.locations.map(loc => [loc.lat, loc.lng]),
+        [route.depot.lat, route.depot.lng],
+      ];
+
+      polyline = L.polyline(coordinates, {
+        color: '#3b82f6',
+        weight: 4,
+        opacity: 0.7,
+        dashArray: '10, 10', // Dashed line to indicate it's not real roads
+      }).addTo(map);
+    }
 
     setRoutePolyline(polyline);
 
@@ -375,17 +424,70 @@ const HarareGarbageRouter = () => {
     map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
   };
 
-  const handleCompareAlgorithms = () => {
+  const handleCompareAlgorithms = async () => {
     if (!depot) {
       alert('Please set a depot location first!');
       return;
     }
 
-    const comparison = compareAlgorithms(depot, ranks);
-    setShowComparison(true);
-    
-    // Show comparison in console for now
-    console.log('Algorithm Comparison:', comparison);
+    setIsGeneratingRoute(true);
+
+    try {
+      // Generate both routes with algorithms
+      const comparison = compareAlgorithms(depot, ranks);
+      
+      // Get real metrics for both routes
+      const nnMetrics = await getRealRouteMetrics(depot, comparison.nearestNeighbor.locations);
+      const pwMetrics = await getRealRouteMetrics(depot, comparison.priorityWeighted.locations);
+
+      // Update routes with real metrics
+      if (nnMetrics) {
+        comparison.nearestNeighbor.totalDistance = nnMetrics.distance;
+        comparison.nearestNeighbor.estimatedTime = nnMetrics.duration;
+      }
+
+      if (pwMetrics) {
+        comparison.priorityWeighted.totalDistance = pwMetrics.distance;
+        comparison.priorityWeighted.estimatedTime = pwMetrics.duration;
+      }
+
+      setShowComparison(true);
+      
+      // Display comparison
+      console.log('Algorithm Comparison (Real Road Distances):', {
+        nearestNeighbor: {
+          distance: comparison.nearestNeighbor.totalDistance.toFixed(2) + ' km',
+          time: Math.round(comparison.nearestNeighbor.estimatedTime) + ' min',
+          stops: comparison.nearestNeighbor.locations.length,
+        },
+        priorityWeighted: {
+          distance: comparison.priorityWeighted.totalDistance.toFixed(2) + ' km',
+          time: Math.round(comparison.priorityWeighted.estimatedTime) + ' min',
+          stops: comparison.priorityWeighted.locations.length,
+        },
+        winner: comparison.nearestNeighbor.totalDistance < comparison.priorityWeighted.totalDistance 
+          ? 'Nearest Neighbor (shorter)' 
+          : 'Priority-Weighted (better for urgent bins)',
+      });
+
+      alert(
+        `Algorithm Comparison:\n\n` +
+        `Nearest Neighbor:\n` +
+        `  Distance: ${comparison.nearestNeighbor.totalDistance.toFixed(2)} km\n` +
+        `  Time: ${Math.round(comparison.nearestNeighbor.estimatedTime)} min\n\n` +
+        `Priority-Weighted:\n` +
+        `  Distance: ${comparison.priorityWeighted.totalDistance.toFixed(2)} km\n` +
+        `  Time: ${Math.round(comparison.priorityWeighted.estimatedTime)} min\n\n` +
+        `${comparison.nearestNeighbor.totalDistance < comparison.priorityWeighted.totalDistance 
+          ? '✓ Nearest Neighbor is shorter' 
+          : '✓ Priority-Weighted prioritizes urgent bins'}`
+      );
+    } catch (error) {
+      console.error('Error comparing algorithms:', error);
+      alert('Failed to compare algorithms. Please try again.');
+    } finally {
+      setIsGeneratingRoute(false);
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -518,7 +620,14 @@ const HarareGarbageRouter = () => {
           {/* Route Information */}
           {currentRoute && (
             <div className="mt-6 bg-green-50 rounded-lg p-4 border border-green-200">
-              <h3 className="font-semibold text-gray-800 mb-3">Route Summary</h3>
+              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                Route Summary
+                {routeGeometry && (
+                  <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full">
+                    Real Roads
+                  </span>
+                )}
+              </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Algorithm:</span>
@@ -536,6 +645,11 @@ const HarareGarbageRouter = () => {
                   <span className="text-gray-600">Stops:</span>
                   <span className="font-semibold">{currentRoute.locations.length}</span>
                 </div>
+                {routeGeometry && (
+                  <div className="pt-2 mt-2 border-t border-green-200 text-xs text-gray-600">
+                    ✓ Route follows actual road network
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -544,11 +658,20 @@ const HarareGarbageRouter = () => {
         <div className="p-6 border-t border-gray-200 space-y-3">
           <button 
             onClick={handleGenerateRoute}
-            disabled={!depot || ranks.length === 0}
+            disabled={!depot || ranks.length === 0 || isGeneratingRoute}
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            <Navigation size={18} />
-            Generate Route
+            {isGeneratingRoute ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Generating Route...
+              </>
+            ) : (
+              <>
+                <Navigation size={18} />
+                Generate Route
+              </>
+            )}
           </button>
           <button 
             onClick={() => {
@@ -563,9 +686,17 @@ const HarareGarbageRouter = () => {
           {depot && ranks.length > 0 && (
             <button 
               onClick={handleCompareAlgorithms}
-              className="w-full bg-purple-100 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-200 transition flex items-center justify-center gap-2"
+              disabled={isGeneratingRoute}
+              className="w-full bg-purple-100 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-200 transition flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              Compare Algorithms
+              {isGeneratingRoute ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Comparing...
+                </>
+              ) : (
+                'Compare Algorithms'
+              )}
             </button>
           )}
         </div>
