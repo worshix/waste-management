@@ -21,12 +21,21 @@ const HarareGarbageRouter = () => {
   const [routeGeometry, setRouteGeometry] = useState<any>(null);
 
   // Initial rank locations in Harare CBD
+/*
+Copacabana -17.831677089653297, 31.0433604572801
+Forth Street Rank -17.829881768470305, 31.05604604777278
+RoadPort -17.83031874178626, 31.057026589070936
+Market Square -17.836824324959252, 31.041898409952537
+*/
+
   const initialRanks: Rank[] = [
-    { id: '1', name: "Fourth Street Rank", lat: -17.8252, lng: 31.0522, priority: "high", fillLevel: 75, fillRate: 5, capacity: 1000 },
+    { id: '1', name: "Fourth Street Rank", lat: -17.831677089653297, lng: 31.0433604572801, priority: "low", fillLevel: 75, fillRate: 5, capacity: 1000 },
     { id: '2', name: "Copa Cabana", lat: -17.8292, lng: 31.0518, priority: "high", fillLevel: 60, fillRate: 4, capacity: 1000 },
     { id: '3', name: "Roadport", lat: -17.8312, lng: 31.0475, priority: "medium", fillLevel: 45, fillRate: 3, capacity: 800 },
     { id: '4', name: "Market Square", lat: -17.8275, lng: 31.0495, priority: "high", fillLevel: 80, fillRate: 6, capacity: 1200 }
   ];
+
+
 
   const [ranks, setRanks] = useState<Rank[]>(initialRanks);
   const [depot, setDepot] = useState<Depot | null>(null);
